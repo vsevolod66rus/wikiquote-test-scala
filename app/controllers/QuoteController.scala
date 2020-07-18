@@ -51,4 +51,12 @@ class QuoteController @Inject()(cc: ControllerComponents,
           }
       }
   }
+
+  def getCategoriesInfo = Action.async {
+    implicit request: Request[AnyContent] =>
+      service.getCategoriesInfo.flatMap {
+        case Right(value) => Future.successful(Ok(Json.toJson(value)))
+        case Left(err)    => Future.successful(BadRequest(err.getMessage))
+      }
+  }
 }

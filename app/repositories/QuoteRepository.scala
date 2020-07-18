@@ -31,6 +31,8 @@ trait QuoteRepository {
   def findQuote(title: String): IO[QuoteGetFormat]
 
   def checkPath: IO[(Boolean, String)]
+
+  def getCategoriesInfo: IO[List[QuoteCategoriesInfo]]
 }
 
 class QuoteRepositoryImpl @Inject()(configuration: Configuration)
@@ -202,6 +204,14 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
         .exists(Paths.get(configuration.get[String]("read.path")))
         .pure[IO]
     } yield (res, path)
+
+  def getCategoriesInfo: IO[List[QuoteCategoriesInfo]] =
+    sql"""select caption, count(*) as count from quote_category_relation 
+          left join quote_category on quote_category_relation.category_id = quote_category.id 
+          group by caption order by count desc;"""
+      .query[QuoteCategoriesInfo]
+      .to[List]
+      .transact(transactor)
 
   val system = ActorSystem("wiki-test")
 

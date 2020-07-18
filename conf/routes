@@ -1,5 +1,6 @@
 
-GET        /importQuotes        controllers.QuoteController.importQuotes()
+GET        /importQuotes               controllers.QuoteController.importQuotes()
 
-GET        /wiki/:title         controllers.QuoteController.findQuote(title: String, pretty: Option[String])
+GET        /wiki/:title                controllers.QuoteController.findQuote(title: String, pretty: Option[String])
 
+GET        /categoriesInfo        controllers.QuoteController.getCategoriesInfo

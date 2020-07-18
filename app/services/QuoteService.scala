@@ -11,6 +11,8 @@ trait QuoteService {
   def findQuote(title: String): Future[Either[Throwable, QuoteGetFormat]]
 
   def checkPath: Future[Either[Throwable, (Boolean, String)]]
+
+  def getCategoriesInfo: Future[Either[Throwable, List[QuoteCategoriesInfo]]]
 }
 
 class QuoteServiceImpl @Inject()(repository: QuoteRepositoryImpl)
@@ -23,4 +25,7 @@ class QuoteServiceImpl @Inject()(repository: QuoteRepositoryImpl)
 
   def checkPath: Future[Either[Throwable, (Boolean, String)]] =
     repository.checkPath.attempt.unsafeToFuture()
+
+  def getCategoriesInfo: Future[Either[Throwable, List[QuoteCategoriesInfo]]] =
+    repository.getCategoriesInfo.attempt.unsafeToFuture()
 }
