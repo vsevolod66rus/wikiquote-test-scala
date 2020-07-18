@@ -13,6 +13,12 @@ trait QuoteService {
   def checkPath: Future[Either[Throwable, (Boolean, String)]]
 
   def getCategoriesInfo: Future[Either[Throwable, List[QuoteCategoriesInfo]]]
+
+  def changeQuote(
+    quoteGetFormat: QuoteGetFormat
+  ): Future[Either[Throwable, Int]]
+
+  def addQuote(quoteAddFormat: QuoteAddFormat): Future[Either[Throwable, Int]]
 }
 
 class QuoteServiceImpl @Inject()(repository: QuoteRepositoryImpl)
@@ -28,4 +34,12 @@ class QuoteServiceImpl @Inject()(repository: QuoteRepositoryImpl)
 
   def getCategoriesInfo: Future[Either[Throwable, List[QuoteCategoriesInfo]]] =
     repository.getCategoriesInfo.attempt.unsafeToFuture()
+
+  def changeQuote(
+    quoteGetFormat: QuoteGetFormat
+  ): Future[Either[Throwable, Int]] =
+    repository.changeQuote(quoteGetFormat).attempt.unsafeToFuture()
+
+  def addQuote(quoteAddFormat: QuoteAddFormat) =
+    repository.addQuote(quoteAddFormat).attempt.unsafeToFuture()
 }

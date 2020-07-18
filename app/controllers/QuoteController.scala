@@ -59,4 +59,32 @@ class QuoteController @Inject()(cc: ControllerComponents,
         case Left(err)    => Future.successful(BadRequest(err.getMessage))
       }
   }
+
+  def changeQuote = Action.async(parse.json) { implicit request =>
+    request.body
+      .validate[QuoteGetFormat]
+      .fold(
+        _ => {
+          Future.successful(BadRequest("Invalid quote data format"))
+        },
+        service.changeQuote(_).flatMap {
+          case Right(_)  => Future.successful(Ok("Quote was changed"))
+          case Left(err) => Future.successful(BadRequest(err.getMessage))
+        }
+      )
+  }
+
+  def addQuote = Action.async(parse.json) { implicit request =>
+    request.body
+      .validate[QuoteAddFormat]
+      .fold(
+        _ => {
+          Future.successful(BadRequest("Invalid quote data format"))
+        },
+        service.addQuote(_).flatMap {
+          case Right(_)  => Future.successful(Ok("Quote was added"))
+          case Left(err) => Future.successful(BadRequest(err.getMessage))
+        }
+      )
+  }
 }

@@ -6,12 +6,13 @@ import doobie.ConnectionIO
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import doobie.free.connection
+import doobie.implicits.javasql._
 import cats.effect.{ContextShift, IO}
 import cats.syntax.flatMap.catsSyntaxIfM
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.traverse._
-import doobie.implicits.javasql._
+
 import java.nio.file.{Files, Paths}
 
 import scala.io.Source
@@ -24,26 +25,23 @@ import exceptions.InvalidInputException
 import play.api.libs.json.Json
 
 trait QuoteRepository {
-  def addQuote(quote: Quote): IO[Int]
-
   def readQuotesFromJsonFile: IO[(Int, Int)]
-
-  def findQuote(title: String): IO[QuoteGetFormat]
 
   def checkPath: IO[(Boolean, String)]
 
+  def findQuote(title: String): IO[QuoteGetFormat]
+
   def getCategoriesInfo: IO[List[QuoteCategoriesInfo]]
+
+  def changeQuote(quoteGetFormat: QuoteGetFormat): IO[Int]
+
+  def addQuote(quote: QuoteAddFormat): IO[Int]
 }
 
 class QuoteRepositoryImpl @Inject()(configuration: Configuration)
     extends QuoteRepository {
 
-  def addQuotes(quotes: List[Quote]): IO[List[Int]] =
-    for {
-      res <- quotes.traverse(addQuote)
-    } yield res
-
-  def addQuote(quote: Quote): IO[Int] =
+  private def importQuote(quote: Quote): IO[Int] =
     (for {
       _ <- isQuoteExist(quote.title)
       id <- addQuoteInfo(
@@ -115,7 +113,7 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
                      fail: Int): IO[(Int, Int)] = {
         quotes match {
           case head :: tail =>
-            addQuote(head).attempt.flatMap {
+            importQuote(head).attempt.flatMap {
               case Right(_) => quotesLoop(tail, success + 1, fail)
               case Left(_)  => quotesLoop(tail, success, fail + 1)
             }
@@ -208,10 +206,51 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
   def getCategoriesInfo: IO[List[QuoteCategoriesInfo]] =
     sql"""select caption, count(*) as count from quote_category_relation 
           left join quote_category on quote_category_relation.category_id = quote_category.id 
-          group by caption order by count desc;"""
+          group by caption order by count desc"""
       .query[QuoteCategoriesInfo]
       .to[List]
       .transact(transactor)
+
+  def changeQuote(quote: QuoteGetFormat): IO[Int] =
+    (for {
+      _ <- deleteQuoteRelation(quote.id)
+      _ <- quote.category.traverse { category =>
+        addCategory(quote.id, category)
+      }
+      _ <- quote.auxiliaryText.get
+        .traverse { text =>
+          insertAuxiliaryText(quote.id, text)
+        }
+        .whenA(quote.auxiliaryText.isDefined)
+      timestamp <- new Timestamp(System.currentTimeMillis())
+        .pure[ConnectionIO]
+      res <- sql"""update quote set last_modified = $timestamp, 
+              language = ${quote.language}, 
+              wiki = ${quote.wiki}, 
+              title = ${quote.title} where id = ${quote.id}""".update.run
+    } yield res).transact(transactor)
+
+  def addQuote(quote: QuoteAddFormat): IO[Int] = {
+    val timestamp = new Timestamp(System.currentTimeMillis())
+    importQuote(
+      Quote(
+        None,
+        timestamp,
+        timestamp,
+        quote.language,
+        quote.wiki,
+        quote.category,
+        quote.title,
+        quote.auxiliaryText
+      )
+    )
+  }
+
+  private def deleteQuoteRelation(id: Int): ConnectionIO[Unit] =
+    for {
+      _ <- sql"delete from quote_category_relation where quote_id = $id".update.run
+      _ <- sql"delete from quote_auxiliary_text where quote_id = $id".update.run
+    } yield ()
 
   val system = ActorSystem("wiki-test")
 

@@ -25,6 +25,12 @@ case class QuoteGetFormat(id: Int,
 
 case class QuoteCategoriesInfo(category: String, count: Int)
 
+case class QuoteAddFormat(language: String,
+                          wiki: String,
+                          category: List[String],
+                          title: String,
+                          auxiliaryText: Option[List[String]])
+
 object Quote {
   implicit object timestampFormat extends Format[Timestamp] {
     val format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
@@ -55,4 +61,9 @@ object QuoteGetFormat {
 object QuoteCategoriesInfo {
   implicit val quoteCategoriesInfoWriter: Format[QuoteCategoriesInfo] =
     Json.format[QuoteCategoriesInfo]
+}
+
+object QuoteAddFormat {
+  implicit val quoteAddFormatReader: Format[QuoteAddFormat] =
+    Json.format[QuoteAddFormat]
 }
