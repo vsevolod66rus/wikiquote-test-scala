@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import services.QuoteServiceImpl
 
 import javax.inject._
-import play.api._
 import play.api.libs.json.Json
 import play.api.mvc._
 import models._

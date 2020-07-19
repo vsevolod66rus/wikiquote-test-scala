@@ -5,14 +5,14 @@ import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import play.api.libs.json._
 
-case class Quote(id: Option[Int],
-                 createTimestamp: Timestamp,
-                 timestamp: Timestamp,
-                 language: String,
-                 wiki: String,
-                 category: List[String],
-                 title: String,
-                 auxiliaryText: Option[List[String]])
+case class QuoteImportFormat(id: Option[Int],
+                             createTimestamp: Timestamp,
+                             timestamp: Timestamp,
+                             language: String,
+                             wiki: String,
+                             category: List[String],
+                             title: String,
+                             auxiliaryText: Option[List[String]])
 
 case class QuoteGetFormat(id: Int,
                           creationDate: Long,
@@ -31,7 +31,7 @@ case class QuoteAddFormat(language: String,
                           title: String,
                           auxiliaryText: Option[List[String]])
 
-object Quote {
+object QuoteImportFormat {
   implicit object timestampFormat extends Format[Timestamp] {
     val format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
     def reads(json: JsValue) = {
@@ -40,7 +40,7 @@ object Quote {
     }
     def writes(ts: Timestamp) = JsString(format.format(ts))
   }
-  implicit val quoteReader: Reads[Quote] = (
+  implicit val quoteReader: Reads[QuoteImportFormat] = (
     (__ \ "id").readNullable[Int] and
       (__ \ "create_timestamp").read[Timestamp] and
       (__ \ "timestamp").read[Timestamp] and
@@ -50,7 +50,7 @@ object Quote {
       (__ \ "title").read[String] and
       (__ \ "auxiliary_text")
         .readNullable[List[String]]
-  )(Quote.apply _)
+  )(QuoteImportFormat.apply _)
 }
 
 object QuoteGetFormat {

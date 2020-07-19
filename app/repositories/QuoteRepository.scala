@@ -1,11 +1,10 @@
 package repositories
 
-import java.sql.Timestamp
-
 import doobie.ConnectionIO
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import doobie.free.connection
+import doobie.util.fragment.Fragment
 import doobie.implicits.javasql._
 import cats.effect.{ContextShift, IO}
 import cats.syntax.flatMap.catsSyntaxIfM
@@ -14,15 +13,15 @@ import cats.syntax.applicative._
 import cats.syntax.traverse._
 
 import java.nio.file.{Files, Paths}
-
+import java.sql.Timestamp
 import scala.io.Source
+
 import com.google.inject.Inject
-import doobie.util.fragment.Fragment
 import play.api.Configuration
-import models._
 import akka.actor.ActorSystem
-import exceptions.InvalidInputException
 import play.api.libs.json.Json
+import exceptions.InvalidInputException
+import models._
 
 trait QuoteRepository {
   def readQuotesFromJsonFile: IO[(Int, Int)]
@@ -41,9 +40,16 @@ trait QuoteRepository {
 class QuoteRepositoryImpl @Inject()(configuration: Configuration)
     extends QuoteRepository {
 
-  private def importQuote(quote: Quote): IO[Int] =
+  private def importQuote(quote: QuoteImportFormat): IO[Int] =
     (for {
-      _ <- isQuoteExist(quote.title)
+      exists <- isTitleExists(quote.title)
+      _ <- connection
+        .raiseError(
+          InvalidInputException(
+            s"Quote with title ${quote.title} already exists"
+          )
+        )
+        .whenA(exists)
       id <- addQuoteInfo(
         quote.createTimestamp,
         quote.timestamp,
@@ -54,11 +60,11 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
       _ <- quote.category.traverse { category =>
         addCategory(id, category)
       }
-      _ <- quote.auxiliaryText.get
+      _ <- quote.auxiliaryText
+        .getOrElse(Nil)
         .traverse { text =>
           insertAuxiliaryText(id, text)
         }
-        .whenA(quote.auxiliaryText.isDefined)
     } yield id)
       .transact(transactor)
 
@@ -102,13 +108,13 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
     if (Files
           .exists(Paths.get(configuration.get[String]("read.path")))) {
       val buffer = Source.fromFile(configuration.get[String]("read.path"))
-      val raw = buffer.getLines.toList
+      val raw = buffer.getLines().toList
       buffer.close()
       val rawQuotes = raw
         .map(str => Json.parse(str))
-        .filter(_.validate[Quote].isSuccess)
-        .map(_.as[Quote])
-      def quotesLoop(quotes: List[Quote],
+        .filter(_.validate[QuoteImportFormat].isSuccess)
+        .map(_.as[QuoteImportFormat])
+      def quotesLoop(quotes: List[QuoteImportFormat],
                      success: Int,
                      fail: Int): IO[(Int, Int)] = {
         quotes match {
@@ -213,15 +219,23 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
 
   def changeQuote(quote: QuoteGetFormat): IO[Int] =
     (for {
+      exists <- isTitleExists(quote.title)
+      _ <- connection
+        .raiseError(
+          InvalidInputException(
+            s"Quote with title ${quote.title} already exists"
+          )
+        )
+        .whenA(exists)
       _ <- deleteQuoteRelation(quote.id)
       _ <- quote.category.traverse { category =>
         addCategory(quote.id, category)
       }
-      _ <- quote.auxiliaryText.get
+      _ <- quote.auxiliaryText
+        .getOrElse(Nil)
         .traverse { text =>
           insertAuxiliaryText(quote.id, text)
         }
-        .whenA(quote.auxiliaryText.isDefined)
       timestamp <- new Timestamp(System.currentTimeMillis())
         .pure[ConnectionIO]
       res <- sql"""update quote set last_modified = $timestamp, 
@@ -233,7 +247,7 @@ class QuoteRepositoryImpl @Inject()(configuration: Configuration)
   def addQuote(quote: QuoteAddFormat): IO[Int] = {
     val timestamp = new Timestamp(System.currentTimeMillis())
     importQuote(
-      Quote(
+      QuoteImportFormat(
         None,
         timestamp,
         timestamp,
